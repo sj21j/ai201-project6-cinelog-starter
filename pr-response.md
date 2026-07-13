@@ -12,8 +12,8 @@
 **How I verified:** Ran a manual script that adds the same film to a user's watchlist twice — the first call succeeds and returns the new entry, the second raises `AlreadyInWatchlistError` as expected.
 
 ## Comment 3 — Missing test
-**What I did:**
-**How I verified:**
+**What I did:** Created `tests/test_watchlist.py` with `test_add_to_watchlist_nonexistent_film_raises`, modeled directly on `test_add_to_collection_nonexistent_film_raises` in `tests/test_collection.py` — same `app`/`sample_user` fixture style (in-memory SQLite app fixture), same assertion pattern (`pytest.raises(FilmNotFoundError)` when calling with a film_id that doesn't exist in the database).
+**How I verified:** Ran `pytest tests/test_watchlist.py -v` (passes), then the full suite `pytest tests/ -v` — all 5 tests pass (4 existing collection tests + the new watchlist test), confirming nothing else broke.
 
 ## Comment 4 — Default visibility
 **My position:**
