@@ -8,8 +8,8 @@
 **How I verified:** Ran `grep -rn "save_to_watchlist" . --include=*.py` — no remaining references. Confirmed the app still boots (`create_app()` succeeds, all blueprints register) after the rename.
 
 ## Comment 2 — Deduplication
-**What I did:**
-**How I verified:**
+**What I did:** Added an `AlreadyInWatchlistError` exception and a dedup check inside `add_to_watchlist()`, matching the exact pattern used by `add_to_collection()` in `services/collection_service.py`: after confirming the film exists, query `WatchlistEntry` by `user_id`+`film_id`, and raise if an entry already exists (same behavior as collection — raise, not silent no-op).
+**How I verified:** Ran a manual script that adds the same film to a user's watchlist twice — the first call succeeds and returns the new entry, the second raises `AlreadyInWatchlistError` as expected.
 
 ## Comment 3 — Missing test
 **What I did:**
