@@ -1,7 +1,8 @@
 # PR Response Doc — CineLog Watchlist Feature
 
 ## AI Usage
-<!-- Fill in at the end — how you used AI tools during this project -->
+
+Used Claude Code throughout, including writing the code changes for Comments 1–3 and 6, and the self-critique pass for Comments 4&5 (which surfaced a real gap in the Comment 4 visibility argument, folded into the final text). Also used AI to run the interactive rebase via scripted git editors, and to manually test the running app with `curl`, which caught two pre-existing bugs unrelated to the 6 comments (noted in the PR Description above).
 
 ## Comment 1 — Rename
 **What I did:** Renamed `save_to_watchlist()` to `add_to_watchlist()` in `services/watchlist_service.py` to match the project's `verb_to_noun` naming convention already used by `add_to_collection()` in `services/collection_service.py`. Updated the one call site in `routes/watchlist/watchlist.py` (`add_film` route), including its import statement.
