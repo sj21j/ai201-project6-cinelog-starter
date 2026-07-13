@@ -37,4 +37,67 @@
 **How I verified no conflict remains:** `git log --graph --oneline origin/main..HEAD` shows a fully linear history, no merge commits. `grep -rn "int" services/watchlist_service.py routes/watchlist/watchlist.py tests/test_watchlist.py models.py` turns up no real integer-`film_id` references (only unrelated matches like `Blueprint` and the `unique_user_film_collection` constraint name). Ran the full suite (`pytest tests/ -v`) — all 5 tests pass. Also ran a manual end-to-end script creating a real `Film` (confirming SQLAlchemy assigns a UUID string `id`), calling `add_to_watchlist()` with that real UUID, and confirming both the add and the dedup check (`AlreadyInWatchlistError`) still work correctly against UUID film IDs.
 
 ## PR Description
-<!-- Written at the end — feature overview, design decisions, manual testing steps -->
+
+### What this adds
+
+A watchlist feature for CineLog: users can save films they want to watch later, view their watchlist, and the system prevents adding the same film twice. This mirrors the existing collection feature (`services/collection_service.py`) but represents forward-looking intent ("want to watch") rather than a historical log ("already watched").
+
+- `WatchlistEntry` model (`models.py`) — links a user to a film, with `date_added` and a `public` flag.
+- `add_to_watchlist(user_id, film_id)` (`services/watchlist_service.py`) — creates an entry; raises `FilmNotFoundError` for an unknown film, `AlreadyInWatchlistError` for a duplicate.
+- `get_watchlist(user_id)` — returns all of a user's watchlist entries, alphabetically by film title.
+- `POST /watchlist/<user_id>/add` and `GET /watchlist/<user_id>` (`routes/watchlist/watchlist.py`).
+
+### Design decisions
+
+- **Default visibility (Comment 4):** New watchlist entries default to `public=True`. See the full reasoning and acknowledged tradeoff above — summary: a watchlist in a community app is meant to be shared (unlike the private collection log), but this default is only meaningful once a per-call override exists, which isn't part of this PR yet (tracked as a stretch feature).
+- **Sort order (Comment 5):** Documented agreement with the reviewer that watchlists should sort by date-added (newest first) rather than alphabetically, for consistency with `get_collection()` and because a watchlist is an action queue, not a lookup catalog. This PR does not change `get_watchlist()`'s current alphabetical sort — per the assignment's framing, this is a documented decision rather than a code change in this pass.
+
+### Manual testing
+
+The app has no user/film creation endpoints (films are seeded; users aren't created via the API in this codebase yet), so seed test data via a Python shell first:
+
+```bash
+python3
+```
+```python
+from app import create_app, db
+from models import User, Film
+
+app = create_app()
+with app.app_context():
+    db.create_all()
+    user = User(username="demo", email="demo@example.com")
+    film = Film(title="Paddington 2", year=2017, genre="Comedy")
+    db.session.add_all([user, film])
+    db.session.commit()
+    print("user_id:", user.id)
+    print("film_id:", film.id)
+```
+
+Then, with the app running (`python app.py`, `http://localhost:5000`). **All of the below was actually run against a live instance of the app, not just described** — two real, pre-existing issues surfaced that aren't part of the 6 review comments and are called out below rather than silently fixed:
+
+1. **Add to watchlist:**
+   `curl -X POST http://localhost:5000/watchlist/<user_id>/add -H "Content-Type: application/json" -d '{"film_id": "<film_id>"}'`
+   → Confirmed `201`, returns the new entry with `"public": true`.
+2. **View watchlist:**
+   `curl http://localhost:5000/watchlist/<user_id>`
+   → **Confirmed broken: `500 Internal Server Error`.** `WatchlistEntry` has no `film` relationship defined on the model, so `get_watchlist()`'s `entry.film.to_dict()` raises `AttributeError: 'WatchlistEntry' object has no attribute 'film'`. This bug predates this PR (present since the original `ec90edb` commit) and isn't one of the 6 review comments, so it's left unfixed here and flagged for a follow-up PR.
+3. **Duplicate add (dedup check):**
+   Repeat step 1 with the same `user_id`/`film_id`. → **Confirmed the dedup check itself works** (raises `AlreadyInWatchlistError` — verified directly against the service function in earlier testing), but at the route level this surfaces as `500 Internal Server Error` rather than a clean 409, because `routes/watchlist/watchlist.py`'s `add_film` doesn't catch it (unlike `collection.py`'s equivalent route). Also pre-existing, also out of scope for the 6 comments.
+4. **Nonexistent film:**
+   `curl -X POST http://localhost:5000/watchlist/<user_id>/add -H "Content-Type: application/json" -d '{"film_id": "00000000-0000-0000-0000-000000000000"}'`
+   → **Confirmed** `500` for the same reason as step 3 (`FilmNotFoundError` uncaught at the route level). The service-level behavior itself (raising `FilmNotFoundError`) is correct and is what Comment 3's test verifies directly.
+5. **Automated tests:** `pytest tests/ -v` — confirmed all 5 tests pass (4 collection + 1 new watchlist test).
+
+### Commit history
+
+```
+9d906df fix: update watchlist film_id fields to UUID after main refactor
+3b8ff6a docs: add pr-response.md decisions for default visibility and sort order
+1b4e577 test: add test for nonexistent film_id in add_to_watchlist
+b226459 fix: add deduplication check to add_to_watchlist
+4ed0f7f fix: rename save_to_watchlist to add_to_watchlist
+d1615e3 feat: add watchlist model and endpoints
+```
+
+6 commits, conventional-format, linear history (no merge commits) rebased onto `main`.
