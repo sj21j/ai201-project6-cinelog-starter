@@ -93,6 +93,8 @@ Then, with the app running (`python app.py`, `http://localhost:5000`). **All of 
 ### Commit history
 
 ```
+eada2ec docs: fill in AI Usage section in pr-response.md
+553e171 docs: add PR description with manual testing steps to pr-response.md
 9d906df fix: update watchlist film_id fields to UUID after main refactor
 3b8ff6a docs: add pr-response.md decisions for default visibility and sort order
 1b4e577 test: add test for nonexistent film_id in add_to_watchlist
@@ -101,4 +103,4 @@ b226459 fix: add deduplication check to add_to_watchlist
 d1615e3 feat: add watchlist model and endpoints
 ```
 
-6 commits, conventional-format, linear history (no merge commits) rebased onto `main`.
+8 commits, conventional-format, linear history (`git log --merges origin/main..HEAD` returns nothing — no merge commits) rebased onto `main`.
