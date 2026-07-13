@@ -16,14 +16,18 @@
 **How I verified:** Ran `pytest tests/test_watchlist.py -v` (passes), then the full suite `pytest tests/ -v` — all 5 tests pass (4 existing collection tests + the new watchlist test), confirming nothing else broke.
 
 ## Comment 4 — Default visibility
-**My position:**
-**Reasoning:**
-**Tradeoff acknowledged:**
+**My position:** Keep `public=True` as the default, but this needs to be a stated decision rather than an inherited one — which it now is.
+
+**Reasoning:** CineLog is described (README) as a "community film tracking app," and the watchlist is functionally different from the collection: a collection is a personal log of what you've already watched and rated, but a watchlist is forward-looking — "what do I want to watch next" — which is exactly the kind of thing users share to get recommendations, coordinate a group watch, or signal taste to others in a community app. Defaulting new watchlist entries to public lowers the friction for that community behavior; if the default were private, most users likely wouldn't discover or bother flipping a `public` flag per entry, so the feature would default into being invisible even though its whole value in a community app is social. Note also that today `public` is stored but not enforced anywhere — no route currently checks it before returning a user's watchlist — so this is purely about what should render as the intended default when enforcement is added, not about closing an existing hole.
+
+**Tradeoff acknowledged:** The real cost is privacy-by-default: a user who wants to track films to watch without broadcasting taste (e.g., adding something embarrassing, or films for a surprise/gift purpose) is opted into visibility unless they know to change it, and most users don't read defaults carefully. There's a sharper version of this objection worth naming directly: right now `add_to_watchlist()` doesn't expose any way to override `public` per entry, so `True` isn't really a "default" a user can second-guess — it's the only value they get. A privacy-by-design argument says the safer sequencing is to ship `False` first and let users opt in once they have real control, since moving private→public later is low-risk but the reverse means discovering after the fact that people didn't want their data exposed. I'm still landing on `True`, but conditionally: it should ship alongside the per-call `public` override (already tracked as a Stretch Feature), not as a standalone default with no user control. If that override isn't added in this PR, `False` is the more defensible interim default.
 
 ## Comment 5 — Sort order
-**My position:**
-**Reasoning:**
-**Engagement with reviewer's point:**
+**My position:** Agree with the reviewer — switch `get_watchlist()` from `order_by(Film.title.asc())` to date-added order, newest first, matching `get_collection()`'s existing `order_by(CollectionEntry.date_added.desc())` pattern.
+
+**Reasoning:** A watchlist is a short-lived, action-oriented list ("what do I want to watch next"), not a reference catalog you browse by name. The most recent addition is usually the most relevant one — it's what a user just decided they want to watch, and is most likely to be top-of-mind when they open the app again. Alphabetical order is better suited to lists meant for lookup (e.g. the `/films/` catalog, which is browsed rather than acted on), not to a queue a user is actively working through.
+
+**Engagement with reviewer's point:** The reviewer's stated reasoning — "most users want to see what they added recently" — matches how the equivalent `get_collection()` function already behaves (newest-first), so switching the watchlist to the same order isn't just accepting the reviewer's preference, it also removes an inconsistency: right now the two nearly-identical "list of films with metadata" endpoints sort by two different criteria for no stated reason. I don't see a strong counter-case for alphabetical here — it would matter more if watchlists commonly grew to sizes where users hunt for one entry, but nothing in the current feature suggests that's the primary use case.
 
 ## Comment 6 — Rebase
 **What conflicted:**
